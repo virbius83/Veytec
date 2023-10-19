@@ -1,0 +1,63 @@
+---
+- hosts: localhost
+  collections:
+    - netapp.ontap
+  name: test1 
+  
+  vars_prompt: 
+    - name: host
+      prompt: Host IP
+      private: false
+    - name: uname
+      prompt: Enter username
+      private: false
+    - name: passw
+      prompt: Enter password
+      private: true
+    - name: svm
+      prompt: Enter SVM name
+      private: false
+      
+  tasks:
+  - name: This house is broken
+    na_ontap_command:
+      hostname: "{{ host }}"
+      username: "{{ uname }}"
+      password: "{{ passw }}"
+      https: true
+      validate_certs: false
+      command: ['snapmirror show -destination-path {{ svm }}:* -fields state']
+      return_dict: true
+    register: svmdrstatus
+    until: svmdrstatus.msg.stdout.find("Broken-off") != -1
+    retries: 5
+    delay: 30
+    
+  - name: The show-me state (hopefully it's 'broken')
+    debug:
+      msg: "{{ svmdrstatus.msg.stdout_lines[2].split()[2] }}"
+
+  - name: Breakups are so last year
+    na_ontap_command:
+      hostname: 192.168.89.120
+      username: "{{ uname }}"
+      password: "{{ passw }}"
+      https: true
+      validate_certs: false
+      command: ['snapmirror resync -destination-path {{ svm }}:*']
+  - name: I really thought we had something there
+    na_ontap_command:
+      hostname: 192.168.89.120
+      username: "{{ uname }}"
+      password: "{{ passw }}"
+      https: true
+      validate_certs: false
+      command: ['snapmirror show -destination-path {{ svm }}:* -fields state']
+      return_dict: true
+    register: svmbreakstatus
+    until: svmbreakstatus.msg.stdout.find("Mirrored") != -1
+    retries: 3
+    delay: 10
+  - name: show me the status!
+    debug:
+      msg: "{{ svmbreakstatus.msg.stdout_lines[2].split()[2] }}"
